@@ -350,7 +350,7 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
         latents = latents * self.scheduler.init_noise_sigma
         return latents
 
-    def controlnet_hint_conversion(self, controlnet_hint, height, width, num_images_per_prompt):
+    def controlnet_hint_conversion(self, controlnet_hint, height, width, num_images_per_prompt, dtype):
         channels = 3
         if isinstance(controlnet_hint, torch.Tensor):
             # torch.Tensor: acceptble shape are any of chw, bchw(b==1) or bchw(b==num_images_per_prompt)
@@ -358,7 +358,7 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
             shape_bchw = (1, channels, height, width)
             shape_nchw = (num_images_per_prompt, channels, height, width)
             if controlnet_hint.shape in [shape_chw, shape_bchw, shape_nchw]:
-                controlnet_hint = controlnet_hint.to(dtype=self.controlnet.dtype, device=self.controlnet.device)
+                controlnet_hint = controlnet_hint.to(dtype=dtype, device=dtype)
                 if controlnet_hint.shape != shape_nchw:
                     controlnet_hint = controlnet_hint.repeat(num_images_per_prompt, 1, 1, 1)
                 return controlnet_hint
@@ -498,10 +498,10 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
         width = width or self.unet.config.sample_size * self.vae_scale_factor
 
         # 1. Control Embedding check & conversion
-        # controlnet_hint = self.controlnet_hint_conversion(controlnet_hint, height, width, num_images_per_prompt)
         if controlnet_hints is not None:
             controlnet_hints = [
-                self.controlnet_hint_conversion(hint, height, width, num_images_per_prompt)
+                # TODO: Fix the dtype situation here
+                self.controlnet_hint_conversion(hint, height, width, num_images_per_prompt, dtype = self.unet.dtype)
                 for hint in controlnet_hints
             ]
 
