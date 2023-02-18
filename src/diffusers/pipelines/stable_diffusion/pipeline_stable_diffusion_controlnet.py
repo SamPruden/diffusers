@@ -423,6 +423,7 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
         callback_steps: Optional[int] = 1,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
         controlnet_hints: Optional[List[Union[torch.FloatTensor, np.ndarray, PIL.Image.Image]]] = None,
+        controlnet_mean: Optional[bool] = None
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -576,7 +577,7 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
                     ]
                     # TODO: This is bad.
                     # We're doing extra work averaging latents that aren't used for control.
-                    control = [(sum(ctrl) / len(controls)) for ctrl in zip(*controls)]
+                    control = [(sum(ctrl) / (len(controls) if controlnet_mean else 1)) for ctrl in zip(*controls)]
 
                     noise_pred = self.unet(
                         latent_model_input,
