@@ -39,7 +39,7 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
-        controlnet: UNet2DConditionModel,
+        controlnets: List[UNet2DConditionModel],
         scheduler: KarrasDiffusionSchedulers,
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
@@ -52,10 +52,10 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
             text_encoder=text_encoder,
             tokenizer=tokenizer,
             unet=unet,
-            controlnet=controlnet,
             scheduler=scheduler,
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
+            **{f"control_net_{i}": cn for i, cn in enumerate(controlnets)},
         )
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
         self.register_to_config(requires_safety_checker=requires_safety_checker)
@@ -422,7 +422,7 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
         callback: Optional[Callable[[int, int, torch.FloatTensor], None]] = None,
         callback_steps: Optional[int] = 1,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
-        controlnet_hint: Optional[Union[torch.FloatTensor, np.ndarray, PIL.Image.Image]] = None,
+        controlnet_hints: Optional[List[Union[torch.FloatTensor, np.ndarray, PIL.Image.Image]]] = None,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -498,7 +498,12 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
         width = width or self.unet.config.sample_size * self.vae_scale_factor
 
         # 1. Control Embedding check & conversion
-        controlnet_hint = self.controlnet_hint_conversion(controlnet_hint, height, width, num_images_per_prompt)
+        # controlnet_hint = self.controlnet_hint_conversion(controlnet_hint, height, width, num_images_per_prompt)
+        if controlnet_hints is not None:
+            controlnet_hints = [
+                self.controlnet_hint_conversion(hint, height, width, num_images_per_prompt)
+                for hint in controlnet_hints
+            ]
 
         # 2. Check inputs. Raise error if not correct
         self.check_inputs(
@@ -558,11 +563,21 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
                 latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
-                if controlnet_hint is not None:
+                if controlnet_hints is not None and len(controlnet_hints) > 0:
                     # ControlNet predict the noise residual
-                    control = self.controlnet(
-                        latent_model_input, t, encoder_hidden_states=prompt_embeds, controlnet_hint=controlnet_hint
-                    )
+                    controls = [
+                        getattr(self, f"control_net_{i}")(
+                            latent_model_input,
+                            t,
+                            encoder_hidden_states=prompt_embeds,
+                            controlnet_hint=hint
+                        )
+                        for i, hint in enumerate(controlnet_hints)
+                    ]
+                    # TODO: This is bad.
+                    # We're doing extra work averaging latents that aren't used for control.
+                    control = [(sum(ctrl) / len(controls)) for ctrl in zip(*controls)]
+
                     noise_pred = self.unet(
                         latent_model_input,
                         t,
