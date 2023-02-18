@@ -350,7 +350,7 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
         latents = latents * self.scheduler.init_noise_sigma
         return latents
 
-    def controlnet_hint_conversion(self, controlnet_hint, height, width, num_images_per_prompt, dtype):
+    def controlnet_hint_conversion(self, controlnet_hint, height, width, num_images_per_prompt, dtype, device):
         channels = 3
         if isinstance(controlnet_hint, torch.Tensor):
             # torch.Tensor: acceptble shape are any of chw, bchw(b==1) or bchw(b==num_images_per_prompt)
@@ -358,7 +358,7 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
             shape_bchw = (1, channels, height, width)
             shape_nchw = (num_images_per_prompt, channels, height, width)
             if controlnet_hint.shape in [shape_chw, shape_bchw, shape_nchw]:
-                controlnet_hint = controlnet_hint.to(dtype=dtype, device=dtype)
+                controlnet_hint = controlnet_hint.to(dtype=dtype, device=device)
                 if controlnet_hint.shape != shape_nchw:
                     controlnet_hint = controlnet_hint.repeat(num_images_per_prompt, 1, 1, 1)
                 return controlnet_hint
@@ -376,7 +376,7 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
             shape_nhwc = (num_images_per_prompt, height, width, channels)
             if controlnet_hint.shape in [shape_hwc, shape_bhwc, shape_nhwc]:
                 controlnet_hint = torch.from_numpy(controlnet_hint.copy())
-                controlnet_hint = controlnet_hint.to(dtype=dtype, device=dtype)
+                controlnet_hint = controlnet_hint.to(dtype=dtype, device=device)
                 controlnet_hint /= 255.0
                 if controlnet_hint.shape != shape_nhwc:
                     controlnet_hint = controlnet_hint.repeat(num_images_per_prompt, 1, 1, 1)
@@ -391,7 +391,7 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
         elif isinstance(controlnet_hint, PIL.Image.Image):
             if controlnet_hint.size == (width, height):
                 # controlnet_hint = controlnet_hint.convert("RGB")  # make sure 3 channel RGB format
-                return self.controlnet_hint_conversion(np.array(controlnet_hint), height, width, num_images_per_prompt, self.unet.dtype)
+                return self.controlnet_hint_conversion(np.array(controlnet_hint), height, width, num_images_per_prompt, self.unet.dtype, self.unet.device)
             else:
                 raise ValueError(
                     f"Acceptable image size of `controlnet_hint` is ({width}, {height}) but is {controlnet_hint.size}"
@@ -501,7 +501,7 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
         if controlnet_hints is not None:
             controlnet_hints = [
                 # TODO: Fix the dtype situation here
-                self.controlnet_hint_conversion(hint, height, width, num_images_per_prompt, dtype = self.unet.dtype)
+                self.controlnet_hint_conversion(hint, height, width, num_images_per_prompt, dtype = self.unet.dtype, device = self.unet.device)
                 for hint in controlnet_hints
             ]
 
