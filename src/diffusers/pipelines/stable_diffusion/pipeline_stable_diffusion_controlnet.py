@@ -391,7 +391,7 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
         elif isinstance(controlnet_hint, PIL.Image.Image):
             if controlnet_hint.size == (width, height):
                 # controlnet_hint = controlnet_hint.convert("RGB")  # make sure 3 channel RGB format
-                return self.controlnet_hint_conversion(np.array(controlnet_hint), height, width, num_images_per_prompt, , dtype = self.control_net_0.dtype, device = self.control_net_0.device)
+                return self.controlnet_hint_conversion(np.array(controlnet_hint), height, width, num_images_per_prompt, dtype = self.control_net_0.dtype, device = self.control_net_0.device)
             else:
                 raise ValueError(
                     f"Acceptable image size of `controlnet_hint` is ({width}, {height}) but is {controlnet_hint.size}"
