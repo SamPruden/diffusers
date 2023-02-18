@@ -376,7 +376,7 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline):
             shape_nhwc = (num_images_per_prompt, height, width, channels)
             if controlnet_hint.shape in [shape_hwc, shape_bhwc, shape_nhwc]:
                 controlnet_hint = torch.from_numpy(controlnet_hint.copy())
-                controlnet_hint = controlnet_hint.to(dtype=self.controlnet.dtype, device=self.controlnet.device)
+                controlnet_hint = controlnet_hint.to(dtype=dtype, device=dtype)
                 controlnet_hint /= 255.0
                 if controlnet_hint.shape != shape_nhwc:
                     controlnet_hint = controlnet_hint.repeat(num_images_per_prompt, 1, 1, 1)
