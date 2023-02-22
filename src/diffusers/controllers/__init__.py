@@ -17,3 +17,4 @@ from ..utils import is_torch_available
 
 if is_torch_available():
     from .controller import Controller, StepPatcher, ValueStepPatcher, ResidualStepPatcher, DictValueStepPatcher, DictResidualStepPatcher, TControllerParams
+    from .clamped_residual_accumulator import ClampedAccumulatorController
