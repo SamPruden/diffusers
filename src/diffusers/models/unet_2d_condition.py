@@ -13,7 +13,6 @@
 # limitations under the License.
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
-from typing_extensions import Protocol
 
 import torch
 import torch.nn as nn
