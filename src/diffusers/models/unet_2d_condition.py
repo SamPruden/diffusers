@@ -13,10 +13,13 @@
 # limitations under the License.
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
+from typing_extensions import Protocol
 
 import torch
 import torch.nn as nn
 import torch.utils.checkpoint
+
+from ..controllers import Controller, StepPatcher
 
 from ..configuration_utils import ConfigMixin, register_to_config
 from ..loaders import UNet2DConditionLoadersMixin
@@ -37,6 +40,9 @@ from .unet_2d_blocks import (
 
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
+
+
+UNet2DConditionController = Controller[torch.Tensor, Union[torch.Tensor, float, int], torch.Tensor]
 
 
 @dataclass
@@ -456,6 +462,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         attention_mask: Optional[torch.Tensor] = None,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
         return_dict: bool = True,
+        controller: Optional[UNet2DConditionController] = None,
     ) -> Union[UNet2DConditionOutput, Tuple]:
         r"""
         Args:
@@ -492,6 +499,10 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         if attention_mask is not None:
             attention_mask = (1 - attention_mask.to(sample.dtype)) * -10000.0
             attention_mask = attention_mask.unsqueeze(1)
+
+        # Prepare step patcher
+        # TODO: Actually call the hooks for this
+        step_patcher = controller(sample, timestep, encoder_hidden_states) if controller else None
 
         # 0. center input if necessary
         if self.config.center_input_sample:
@@ -588,6 +599,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                 sample = upsample_block(
                     hidden_states=sample, temb=emb, res_hidden_states_tuple=res_samples, upsample_size=upsample_size
                 )
+
         # 6. post-process
         if self.conv_norm_out:
             sample = self.conv_norm_out(sample)

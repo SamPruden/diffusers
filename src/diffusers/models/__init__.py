@@ -23,7 +23,7 @@ if is_torch_available():
     from .transformer_2d import Transformer2DModel
     from .unet_1d import UNet1DModel
     from .unet_2d import UNet2DModel
-    from .unet_2d_condition import UNet2DConditionModel
+    from .unet_2d_condition import UNet2DConditionModel, UNet2DConditionController
     from .vq_model import VQModel
 
 if is_flax_available():
