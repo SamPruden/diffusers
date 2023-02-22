@@ -19,7 +19,6 @@ import torch.nn as nn
 import torch.utils.checkpoint
 
 from ..controllers import Controller, StepPatcher
-
 from ..configuration_utils import ConfigMixin, register_to_config
 from ..loaders import UNet2DConditionLoadersMixin
 from ..utils import BaseOutput, logging
