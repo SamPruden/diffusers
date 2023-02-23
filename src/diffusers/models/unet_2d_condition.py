@@ -25,7 +25,7 @@ from ..utils import BaseOutput, logging
 from .controlnet_blocks import ControlNetInputHintBlock, ControlNetZeroConvBlock
 from .cross_attention import AttnProcessor
 from .embeddings import GaussianFourierProjection, TimestepEmbedding, Timesteps
-from .modeling_utils import ModelMixin
+from .modeling_utils import ModelMixin, StepPatchingMixin
 from .unet_2d_blocks import (
     CrossAttnDownBlock2D,
     CrossAttnUpBlock2D,
@@ -501,6 +501,16 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         if isinstance(module, (CrossAttnDownBlock2D, DownBlock2D, CrossAttnUpBlock2D, UpBlock2D)):
             module.gradient_checkpointing = value
 
+    def _set_step_patcher(self, patcher: StepPatcher):
+        for name, module in self.named_children():
+            if isinstance(module, StepPatchingMixin):
+                module._set_step_patcher(name, patcher)
+
+    def _unset_step_patcher(self):
+        for name, module in self.named_children():
+            if isinstance(module, StepPatchingMixin):
+                module._unset_step_patcher()
+
     def forward(
         self,
         sample: torch.FloatTensor,
@@ -551,8 +561,11 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             attention_mask = attention_mask.unsqueeze(1)
 
         # Prepare step patcher
-        # TODO: Actually call the hooks for this
-        step_patcher = controller(sample, timestep, encoder_hidden_states) if controller else None
+        if controller:
+            step_patcher = controller(sample, timestep, encoder_hidden_states)
+            self._set_step_patcher(step_patcher)
+        else:
+            step_patcher = None
 
         # 0. center input if necessary
         if self.config.center_input_sample:
@@ -626,13 +639,11 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             )
 
         if controlnet_hint is not None:
+            self._unset_step_patcher()
             # ControlNet: zero convs
             return self.controlnet_zero_conv_block(
                 down_block_res_samples=down_block_res_samples, mid_block_sample=sample
             )
-
-        if step_patcher is not None:
-            sample = step_patcher("unet2d.mid.after", sample)
 
         # 5. up
         for i, upsample_block in enumerate(self.up_blocks):
@@ -661,14 +672,13 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                     hidden_states=sample, temb=emb, res_hidden_states_tuple=res_samples, upsample_size=upsample_size
                 )
 
-            if step_patcher is not None:
-                sample = step_patcher(f"unet2d.up.{i}.after", sample)
-
         # 6. post-process
         if self.conv_norm_out:
             sample = self.conv_norm_out(sample)
             sample = self.conv_act(sample)
         sample = self.conv_out(sample)
+
+        self._unset_step_patcher()
 
         if not return_dict:
             return (sample,)

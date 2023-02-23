@@ -39,6 +39,7 @@ from ..utils import (
     is_torch_version,
     logging,
 )
+from ..controllers import StepPatcher
 
 
 logger = logging.get_logger(__name__)
@@ -853,3 +854,35 @@ def _get_model_file(
                 f"Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a directory "
                 f"containing a file named {weights_name}"
             )
+
+
+# Design credit: @HimariO
+# Lovely piece of work.
+class StepPatchingMixin():
+    """
+    A `nn.Module` hook that calls into a `StepPatcher` after the forward pass.
+    """
+
+    def _set_step_patcher(self, name: str, step_patcher: StepPatcher):
+        self._module_name = name
+        self._step_patcher = step_patcher
+
+        for child_name, child in self.named_children():
+            if isinstance(child, StepPatchingMixin):
+                child._set_step_patcher(f"{name}.{child_name}", step_patcher)
+
+    def _unset_step_patcher(self):
+        self._module = None
+        self._step_patcher = None
+        
+        for _, child in self.named_children():
+            if isinstance(child, StepPatchingMixin):
+                child._unset_step_patcher()
+
+    def __call__(self, *args, **kwargs):
+        state = super().__call__(*args, **kwargs)
+        if not hasattr(self, "_step_patcher"): return state
+        if not hasattr(self, "_module_name"): return state
+        if not self._module_name: return state
+        if not self._step_patcher: return state
+        return self._step_patcher(self._module_name, state)
