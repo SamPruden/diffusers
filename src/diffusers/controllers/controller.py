@@ -25,7 +25,7 @@ class StepPatcher(ABC):
     def __init__(self, controller: Controller):
         self.controller = Controller
 
-    def __call__(self, hook: str, sample: torch.Tensor) -> torch.Tensor:
+    def __call__(self, hook: str, sample: torch.FloatTensor) -> torch.FloatTensor:
         """
         Returns:
             The new sample value after patching.
@@ -33,7 +33,7 @@ class StepPatcher(ABC):
         return self.value(hook, sample) or sample
 
     @abstractmethod
-    def value(self, hook: str, sample: torch.Tensor) -> Optional[torch.Tensor]:
+    def value(self, hook: str, sample: torch.FloatTensor) -> Optional[torch.FloatTensor]:
         """
         Returns:
             The new sample value after patching.
@@ -42,7 +42,7 @@ class StepPatcher(ABC):
         pass
 
     @abstractmethod
-    def residual(self, hook: str, sample: torch.Tensor) -> Optional[torch.Tensor]:
+    def residual(self, hook: str, sample: torch.FloatTensor) -> Optional[torch.FloatTensor]:
         """
         Returns:
             A residual to be added to the original sample to create the new value.
@@ -56,7 +56,7 @@ class ValueStepPatcher(StepPatcher):
     A `StepPatcher` defined in terms of the new patched values.
     """
 
-    def residual(self, hook: str, sample: torch.Tensor) -> Optional[torch.Tensor]:
+    def residual(self, hook: str, sample: torch.FloatTensor) -> Optional[torch.FloatTensor]:
         value = self.value(hook, sample)
         return value - sample if value else None
 
@@ -66,7 +66,7 @@ class ResidualStepPatcher(StepPatcher):
     A `StepPatcher` defined in terms of the patch residuals.
     """
 
-    def value(self, hook: str, sample: torch.Tensor) -> torch.Tensor:
+    def value(self, hook: str, sample: torch.FloatTensor) -> torch.FloatTensor:
         residual = self.residual(hook, sample)
         return sample + residual if residual else sample
 
@@ -76,11 +76,11 @@ class DictValueStepPatcher(ValueStepPatcher):
     A `StepPatcher` defined by a dictionary mapping hook strs to new patched values.
     """
     
-    def __init__(self, controller: Controller, dict: Dict[str, torch.Tensor]):
+    def __init__(self, controller: Controller, dict: Dict[str, torch.FloatTensor]):
         super().__init__(controller)
         self.hook_dict = dict
 
-    def value(self, hook: str, sample: torch.Tensor) -> Optional[torch.Tensor]:
+    def value(self, hook: str, sample: torch.FloatTensor) -> Optional[torch.FloatTensor]:
         return self.hook_dict.get(hook)
 
 
@@ -89,11 +89,11 @@ class DictResidualStepPatcher(ResidualStepPatcher):
     A `StepPatcher` defined by a dictionary matching hook strs to patched residuals.
     """
     
-    def __init__(self, controller: Controller, dict: Dict[str, torch.Tensor]):
+    def __init__(self, controller: Controller, dict: Dict[str, torch.FloatTensor]):
         super().__init__(controller)
         self.hook_dict = dict
 
-    def residual(self, hook: str, sample: torch.Tensor) -> Optional[torch.Tensor]:
+    def residual(self, hook: str, sample: torch.FloatTensor) -> Optional[torch.FloatTensor]:
         return self.hook_dict.get(hook)
 
 
