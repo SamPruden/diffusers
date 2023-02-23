@@ -511,6 +511,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         attention_mask: Optional[torch.Tensor] = None,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
         return_dict: bool = True,
+        controlnet_hint: Optional[torch.FloatTensor] = None,
         controller: Optional[UNet2DConditionController] = None,
     ) -> Union[UNet2DConditionOutput, Tuple]:
         r"""
