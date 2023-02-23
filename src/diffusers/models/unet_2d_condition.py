@@ -22,6 +22,7 @@ from ..controllers import Controller, StepPatcher
 from ..configuration_utils import ConfigMixin, register_to_config
 from ..loaders import UNet2DConditionLoadersMixin
 from ..utils import BaseOutput, logging
+from .controlnet_blocks import ControlNetInputHintBlock, ControlNetZeroConvBlock
 from .cross_attention import AttnProcessor
 from .embeddings import GaussianFourierProjection, TimestepEmbedding, Timesteps
 from .modeling_utils import ModelMixin
@@ -95,7 +96,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         resnet_time_scale_shift (`str`, *optional*, defaults to `"default"`): Time scale shift config
             for resnet blocks, see [`~models.resnet.ResnetBlock2D`]. Choose from `default` or `scale_shift`.
         class_embed_type (`str`, *optional*, defaults to None): The type of class embedding to use which is ultimately
-            summed with the time embeddings. Choose from `None`, `"timestep"`, or `"identity"`.
+            summed with the time embeddings. Choose from `None`, `"timestep"`, `"identity"`, or `"projection"`.
         num_class_embeds (`int`, *optional*, defaults to None):
             Input dimension of the learnable embedding matrix to be projected to `time_embed_dim`, when performing
             class conditioning with `class_embed_type` equal to `None`.
@@ -106,7 +107,9 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         time_cond_proj_dim (`int`, *optional*, default to `None`):
             The dimension of `cond_proj` layer in timestep embedding.
         conv_in_kernel (`int`, *optional*, default to `3`): The kernel size of `conv_in` layer.
-        conv_out_kernel (`int`, *optional*, default to `3`): the Kernel size of `conv_out` layer.
+        conv_out_kernel (`int`, *optional*, default to `3`): The kernel size of `conv_out` layer.
+        projection_class_embeddings_input_dim (`int`, *optional*): The dimension of the `class_labels` input when
+            using the "projection" `class_embed_type`. Required when using the "projection" `class_embed_type`.
     """
 
     _supports_gradient_checkpointing = True
@@ -149,10 +152,33 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         time_cond_proj_dim: Optional[int] = None,
         conv_in_kernel: int = 3,
         conv_out_kernel: int = 3,
+        projection_class_embeddings_input_dim: Optional[int] = None,
+        controlnet_hint_channels: Optional[int] = None,
     ):
         super().__init__()
 
         self.sample_size = sample_size
+
+        # Check inputs
+        if len(down_block_types) != len(up_block_types):
+            raise ValueError(
+                f"Must provide the same number of `down_block_types` as `up_block_types`. `down_block_types`: {down_block_types}. `up_block_types`: {up_block_types}."
+            )
+
+        if len(block_out_channels) != len(down_block_types):
+            raise ValueError(
+                f"Must provide the same number of `block_out_channels` as `down_block_types`. `block_out_channels`: {block_out_channels}. `down_block_types`: {down_block_types}."
+            )
+
+        if not isinstance(only_cross_attention, bool) and len(only_cross_attention) != len(down_block_types):
+            raise ValueError(
+                f"Must provide the same number of `only_cross_attention` as `down_block_types`. `only_cross_attention`: {only_cross_attention}. `down_block_types`: {down_block_types}."
+            )
+
+        if not isinstance(attention_head_dim, int) and len(attention_head_dim) != len(down_block_types):
+            raise ValueError(
+                f"Must provide the same number of `attention_head_dim` as `down_block_types`. `attention_head_dim`: {attention_head_dim}. `down_block_types`: {down_block_types}."
+            )
 
         # input
         conv_in_padding = (conv_in_kernel - 1) // 2
@@ -194,6 +220,19 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             self.class_embedding = TimestepEmbedding(timestep_input_dim, time_embed_dim)
         elif class_embed_type == "identity":
             self.class_embedding = nn.Identity(time_embed_dim, time_embed_dim)
+        elif class_embed_type == "projection":
+            if projection_class_embeddings_input_dim is None:
+                raise ValueError(
+                    "`class_embed_type`: 'projection' requires `projection_class_embeddings_input_dim` be set"
+                )
+            # The projection `class_embed_type` is the same as the timestep `class_embed_type` except
+            # 1. the `class_labels` inputs are not first converted to sinusoidal embeddings
+            # 2. it projects from an arbitrary input dimension.
+            #
+            # Note that `TimestepEmbedding` is quite general, being mainly linear layers and activations.
+            # When used for embedding actual timesteps, the timesteps are first converted to sinusoidal embeddings.
+            # As a result, `TimestepEmbedding` can be passed arbitrary vectors.
+            self.class_embedding = TimestepEmbedding(projection_class_embeddings_input_dim, time_embed_dim)
         else:
             self.class_embedding = None
 
@@ -269,6 +308,18 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
 
         # count how many layers upsample the images
         self.num_upsamplers = 0
+
+        if controlnet_hint_channels is not None:
+            # ControlNet: add input_hint_block, zero_conv_block
+            self.controlnet_input_hint_block = ControlNetInputHintBlock(
+                hint_channels=controlnet_hint_channels, channels=block_out_channels[0]
+            )
+            self.controlnet_zero_conv_block = ControlNetZeroConvBlock(
+                block_out_channels=block_out_channels,
+                down_block_types=down_block_types,
+                layers_per_block=layers_per_block,
+            )
+            return  # Modules from the following lines are not defined in ControlNet
 
         # up
         reversed_block_out_channels = list(reversed(block_out_channels))
@@ -544,6 +595,8 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
 
         # 2. pre-process
         sample = self.conv_in(sample)
+        if controlnet_hint is not None:
+            sample += self.controlnet_input_hint_block(controlnet_hint)
 
         # 3. down
         down_block_res_samples = (sample,)
@@ -571,6 +624,15 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                 cross_attention_kwargs=cross_attention_kwargs,
             )
 
+        if controlnet_hint is not None:
+            # ControlNet: zero convs
+            return self.controlnet_zero_conv_block(
+                down_block_res_samples=down_block_res_samples, mid_block_sample=sample
+            )
+
+        if step_patcher is not None:
+            sample = step_patcher("unet2d.mid.after", sample)
+
         # 5. up
         for i, upsample_block in enumerate(self.up_blocks):
             is_final_block = i == len(self.up_blocks) - 1
@@ -597,6 +659,9 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                 sample = upsample_block(
                     hidden_states=sample, temb=emb, res_hidden_states_tuple=res_samples, upsample_size=upsample_size
                 )
+
+            if step_patcher is not None:
+                sample = step_patcher(f"unet2d.up.{i}.after", sample)
 
         # 6. post-process
         if self.conv_norm_out:
