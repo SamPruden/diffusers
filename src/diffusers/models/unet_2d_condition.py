@@ -41,7 +41,7 @@ from .unet_2d_blocks import (
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
-UNet2DConditionController = Controller[torch.Tensor, Union[torch.Tensor, float, int], torch.Tensor]
+UNet2DConditionController = Controller[[torch.Tensor, Union[torch.Tensor, float, int], torch.Tensor]]
 
 
 @dataclass
