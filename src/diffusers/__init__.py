@@ -39,6 +39,7 @@ else:
         Transformer2DModel,
         UNet1DModel,
         UNet2DConditionModel,
+        UNet2DConditionController,
         UNet2DModel,
         VQModel,
     )
@@ -87,6 +88,16 @@ else:
         VQDiffusionScheduler,
     )
     from .training_utils import EMAModel
+    from .controllers import (
+        Controller,
+        TControllerParams,
+        StepPatcher,
+        ValueStepPatcher,
+        ResidualStepPatcher,
+        DictValueStepPatcher,
+        DictResidualStepPatcher,
+        HookLoggingController,
+    )
 
 try:
     if not (is_torch_available() and is_scipy_available()):
