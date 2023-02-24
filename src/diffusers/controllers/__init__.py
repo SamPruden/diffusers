@@ -16,5 +16,11 @@ from ..utils import is_torch_available
 
 
 if is_torch_available():
-    from .controller import Controller, StepPatcher, ValueStepPatcher, ResidualStepPatcher, DictValueStepPatcher, DictResidualStepPatcher, TControllerParams
+    from .controller import (
+        Controller, TControllerParams,
+        StepPatcher,
+        ValueStepPatcher, ResidualStepPatcher,
+        DictValueStepPatcher, DictResidualStepPatcher,
+    )
     from .clamped_residual_accumulator import ClampedAccumulatorController
+    from hook_logging_controller import HookLoggingController
