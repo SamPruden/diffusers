@@ -1,5 +1,5 @@
 from typing import Optional
-from controller import Controller, TControllerParams, ValueStepPatcher
+from .controller import Controller, TControllerParams, ValueStepPatcher
 import torch
 
 class HookLoggingStepPatcher(ValueStepPatcher):
