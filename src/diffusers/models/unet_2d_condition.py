@@ -502,14 +502,10 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             module.gradient_checkpointing = value
 
     def _set_step_patcher(self, patcher: StepPatcher):
-        for name, module in self.named_children():
-            if isinstance(module, StepPatchingMixin):
-                module._set_step_patcher(name, patcher)
+        StepPatchingMixin.set_step_patcher_deep("UNet2DConditionModel", self, patcher)
 
     def _unset_step_patcher(self):
-        for name, module in self.named_children():
-            if isinstance(module, StepPatchingMixin):
-                module._unset_step_patcher()
+        StepPatchingMixin.unset_step_patcher_deep(self)
 
     def forward(
         self,

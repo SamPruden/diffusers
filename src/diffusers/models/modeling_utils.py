@@ -863,26 +863,36 @@ class StepPatchingMixin():
     A `nn.Module` hook that calls into a `StepPatcher` after the forward pass.
     """
 
-    def _set_step_patcher(self, name: str, step_patcher: StepPatcher):
+    def _set_step_patcher(self, name: str, patcher: StepPatcher):
         self._module_name = name
-        self._step_patcher = step_patcher
-
-        for child_name, child in self.named_children():
-            if isinstance(child, StepPatchingMixin):
-                child._set_step_patcher(f"{name}.{child_name}", step_patcher)
+        self._step_patcher = patcher
 
     def _unset_step_patcher(self):
         self._module = None
         self._step_patcher = None
+
+    @staticmethod
+    def set_step_patcher_deep(name: str, module: torch.nn.Module, patcher: StepPatcher):        
+        if isinstance(module, StepPatchingMixin):
+            module._set_step_patcher(name, patcher)
         
-        for _, child in self.named_children():
-            if isinstance(child, StepPatchingMixin):
-                child._unset_step_patcher()
+        for child_name, child in module.named_children():
+            StepPatchingMixin.set_step_patcher_deep(f"{name}.{child_name}", child, patcher)
+
+    @staticmethod
+    def unset_step_patcher_deep(module: torch.nn.Module):
+        if isinstance(module, StepPatchingMixin):
+            module._unset_step_patcher()
+        
+        for child in module.children():
+            StepPatchingMixin.unset_step_patcher_deep(child)
 
     def __call__(self, *args, **kwargs):
-        state = super().__call__(*args, **kwargs)
+        s = super()
+        if not isinstance(s, torch.nn.Module): return
+        state = s.__call__(*args, **kwargs)
         if not hasattr(self, "_step_patcher"): return state
         if not hasattr(self, "_module_name"): return state
-        if not self._module_name: return state
-        if not self._step_patcher: return state
+        if not isinstance(self._module_name, str): return state
+        if not isinstance(self._step_patcher, StepPatcher): return state
         return self._step_patcher(self._module_name, state)
