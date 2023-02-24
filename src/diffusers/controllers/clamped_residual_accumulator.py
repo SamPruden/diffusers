@@ -1,5 +1,5 @@
 from typing import Iterable, Optional
-from diffusers.controllers.controller import Controller, StepPatcher, ResidualStepPatcher, TControllerParams
+from .controller import Controller, StepPatcher, ResidualStepPatcher, TControllerParams
 import torch
 
 
@@ -10,7 +10,7 @@ class ClampedAccumulatorStepPatcher(ResidualStepPatcher):
         self.clamp_factor = clamp_factor
 
     # TODO: Performance
-    def residual(self, hook: str, sample: torch.Tensor) -> Optional[torch.Tensor]:
+    def residual(self, hook: str, sample: torch.FloatTensor) -> Optional[torch.FloatTensor]:
         residuals = [patcher.residual(hook, sample) for patcher in self.patchers]
         residuals = [residual for residual in residuals if residual]
 
