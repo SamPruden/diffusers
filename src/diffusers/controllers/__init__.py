@@ -23,4 +23,4 @@ if is_torch_available():
         DictValueStepPatcher, DictResidualStepPatcher,
     )
     from .clamped_residual_accumulator import ClampedAccumulatorController
-    from hook_logging_controller import HookLoggingController
+    from .hook_logging_controller import HookLoggingController
