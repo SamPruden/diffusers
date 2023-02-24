@@ -22,6 +22,7 @@ from .cross_attention import CrossAttention, CrossAttnAddedKVProcessor
 from .dual_transformer_2d import DualTransformer2DModel
 from .resnet import Downsample2D, FirDownsample2D, FirUpsample2D, KDownsample2D, KUpsample2D, ResnetBlock2D, Upsample2D
 from .transformer_2d import Transformer2DModel
+from .modeling_utils import StepPatchingMixin
 
 
 def get_down_block(
@@ -368,7 +369,7 @@ def get_up_block(
     raise ValueError(f"{up_block_type} does not exist.")
 
 
-class UNetMidBlock2D(nn.Module):
+class UNetMidBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -447,7 +448,7 @@ class UNetMidBlock2D(nn.Module):
         return hidden_states
 
 
-class UNetMidBlock2DCrossAttn(nn.Module):
+class UNetMidBlock2DCrossAttn(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -547,7 +548,7 @@ class UNetMidBlock2DCrossAttn(nn.Module):
         return hidden_states
 
 
-class UNetMidBlock2DSimpleCrossAttn(nn.Module):
+class UNetMidBlock2DSimpleCrossAttn(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -641,7 +642,7 @@ class UNetMidBlock2DSimpleCrossAttn(nn.Module):
         return hidden_states
 
 
-class AttnDownBlock2D(nn.Module):
+class AttnDownBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -720,7 +721,7 @@ class AttnDownBlock2D(nn.Module):
         return hidden_states, output_states
 
 
-class CrossAttnDownBlock2D(nn.Module):
+class CrossAttnDownBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -851,7 +852,7 @@ class CrossAttnDownBlock2D(nn.Module):
         return hidden_states, output_states
 
 
-class DownBlock2D(nn.Module):
+class DownBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -930,7 +931,7 @@ class DownBlock2D(nn.Module):
         return hidden_states, output_states
 
 
-class DownEncoderBlock2D(nn.Module):
+class DownEncoderBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -990,7 +991,7 @@ class DownEncoderBlock2D(nn.Module):
         return hidden_states
 
 
-class AttnDownEncoderBlock2D(nn.Module):
+class AttnDownEncoderBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -1063,7 +1064,7 @@ class AttnDownEncoderBlock2D(nn.Module):
         return hidden_states
 
 
-class AttnSkipDownBlock2D(nn.Module):
+class AttnSkipDownBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -1153,7 +1154,7 @@ class AttnSkipDownBlock2D(nn.Module):
         return hidden_states, output_states, skip_sample
 
 
-class SkipDownBlock2D(nn.Module):
+class SkipDownBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -1232,7 +1233,7 @@ class SkipDownBlock2D(nn.Module):
         return hidden_states, output_states, skip_sample
 
 
-class ResnetDownsampleBlock2D(nn.Module):
+class ResnetDownsampleBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -1320,7 +1321,7 @@ class ResnetDownsampleBlock2D(nn.Module):
         return hidden_states, output_states
 
 
-class SimpleCrossAttnDownBlock2D(nn.Module):
+class SimpleCrossAttnDownBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -1432,7 +1433,7 @@ class SimpleCrossAttnDownBlock2D(nn.Module):
         return hidden_states, output_states
 
 
-class KDownBlock2D(nn.Module):
+class KDownBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -1503,7 +1504,7 @@ class KDownBlock2D(nn.Module):
         return hidden_states, output_states
 
 
-class KCrossAttnDownBlock2D(nn.Module):
+class KCrossAttnDownBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -1615,7 +1616,7 @@ class KCrossAttnDownBlock2D(nn.Module):
         return hidden_states, output_states
 
 
-class AttnUpBlock2D(nn.Module):
+class AttnUpBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -1690,7 +1691,7 @@ class AttnUpBlock2D(nn.Module):
         return hidden_states
 
 
-class CrossAttnUpBlock2D(nn.Module):
+class CrossAttnUpBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -1823,7 +1824,7 @@ class CrossAttnUpBlock2D(nn.Module):
         return hidden_states
 
 
-class UpBlock2D(nn.Module):
+class UpBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -1897,7 +1898,7 @@ class UpBlock2D(nn.Module):
         return hidden_states
 
 
-class UpDecoderBlock2D(nn.Module):
+class UpDecoderBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -1951,7 +1952,7 @@ class UpDecoderBlock2D(nn.Module):
         return hidden_states
 
 
-class AttnUpDecoderBlock2D(nn.Module):
+class AttnUpDecoderBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -2018,7 +2019,7 @@ class AttnUpDecoderBlock2D(nn.Module):
         return hidden_states
 
 
-class AttnSkipUpBlock2D(nn.Module):
+class AttnSkipUpBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -2126,7 +2127,7 @@ class AttnSkipUpBlock2D(nn.Module):
         return hidden_states, skip_sample
 
 
-class SkipUpBlock2D(nn.Module):
+class SkipUpBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -2221,7 +2222,7 @@ class SkipUpBlock2D(nn.Module):
         return hidden_states, skip_sample
 
 
-class ResnetUpsampleBlock2D(nn.Module):
+class ResnetUpsampleBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -2311,7 +2312,7 @@ class ResnetUpsampleBlock2D(nn.Module):
         return hidden_states
 
 
-class SimpleCrossAttnUpBlock2D(nn.Module):
+class SimpleCrossAttnUpBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -2431,7 +2432,7 @@ class SimpleCrossAttnUpBlock2D(nn.Module):
         return hidden_states
 
 
-class KUpBlock2D(nn.Module):
+class KUpBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -2504,7 +2505,7 @@ class KUpBlock2D(nn.Module):
         return hidden_states
 
 
-class KCrossAttnUpBlock2D(nn.Module):
+class KCrossAttnUpBlock2D(StepPatchingMixin, nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -2640,7 +2641,7 @@ class KCrossAttnUpBlock2D(nn.Module):
 
 
 # can potentially later be renamed to `No-feed-forward` attention
-class KAttentionBlock(nn.Module):
+class KAttentionBlock(StepPatchingMixin, nn.Module):
     r"""
     A basic Transformer block.
 
