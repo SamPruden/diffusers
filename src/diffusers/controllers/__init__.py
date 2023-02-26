@@ -24,3 +24,4 @@ if is_torch_available():
     )
     from .accumulators import SumAccumulatorController, ClampedAccumulatorController
     from .hook_logging_controller import HookLoggingController
+    from .controlnet import ControlNetController

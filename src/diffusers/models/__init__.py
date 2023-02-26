@@ -26,6 +26,7 @@ if is_torch_available():
     from .unet_2d import UNet2DModel
     from .unet_2d_condition import UNet2DConditionModel, UNet2DConditionController
     from .vq_model import VQModel
+    from .controlnet import ControlNetModel
 
 if is_flax_available():
     from .unet_2d_condition_flax import FlaxUNet2DConditionModel

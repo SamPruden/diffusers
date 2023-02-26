@@ -34,12 +34,13 @@ except OptionalDependencyNotAvailable:
 else:
     from .models import (
         AutoencoderKL,
+        ControlNetModel,
         ModelMixin,
         PriorTransformer,
         Transformer2DModel,
         UNet1DModel,
-        UNet2DConditionModel,
         UNet2DConditionController,
+        UNet2DConditionModel,
         UNet2DModel,
         VQModel,
     )
@@ -98,6 +99,7 @@ else:
         DictResidualStepPatcher,
         HookLoggingController,
         SumAccumulatorController,
+        ControlNetController,
     )
 
 try:
