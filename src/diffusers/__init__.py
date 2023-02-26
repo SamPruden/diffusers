@@ -97,6 +97,7 @@ else:
         DictValueStepPatcher,
         DictResidualStepPatcher,
         HookLoggingController,
+        SumAccumulatorController,
     )
 
 try:
