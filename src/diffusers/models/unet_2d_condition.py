@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
 import torch
 import torch.nn as nn
@@ -41,7 +41,13 @@ from .unet_2d_blocks import (
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
-UNet2DConditionController = Controller[torch.Tensor, Union[torch.Tensor, float, int], torch.Tensor]
+if TYPE_CHECKING:
+    # typing_extensions can't cope with this, so it doesn't work < 3.10.
+    # See https://github.com/python/typing/discussions/908
+    UNet2DConditionController = Controller[(torch.Tensor, Union[torch.Tensor, float, int], torch.Tensor)]
+else:
+    # I'm not sure whether this is the best way to handle the fallback.
+    UNet2DConditionController = Any
 
 
 @dataclass
@@ -502,10 +508,10 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             module.gradient_checkpointing = value
 
     def _set_step_patcher(self, patcher: StepPatcher):
-        StepPatchingMixin.set_step_patcher_deep("UNet2DConditionModel", self, patcher)
+        StepPatchingMixin.set_step_patcher_recursive("UNet2DConditionModel", self, patcher)
 
     def _unset_step_patcher(self):
-        StepPatchingMixin.unset_step_patcher_deep(self)
+        StepPatchingMixin.unset_step_patcher_recursive(self)
 
     def forward(
         self,

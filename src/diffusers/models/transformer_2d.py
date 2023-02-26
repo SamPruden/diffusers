@@ -23,11 +23,12 @@ from ..models.embeddings import ImagePositionalEmbeddings
 from ..utils import BaseOutput, deprecate
 from .attention import BasicTransformerBlock
 from .embeddings import PatchEmbed
-from .modeling_utils import ModelMixin, StepPatchingMixin
+from .modeling_utils import ModelMixin, StepPatchingMixin, PatchableValueInterface
+from ..controllers import StepPatcher
 
 
 @dataclass
-class Transformer2DModelOutput(BaseOutput):
+class Transformer2DModelOutput(PatchableValueInterface, BaseOutput):
     """
     Args:
         sample (`torch.FloatTensor` of shape `(batch_size, num_channels, height, width)` or `(batch size, num_vector_embeds - 1, num_latent_pixels)` if [`Transformer2DModel`] is discrete):
@@ -36,6 +37,12 @@ class Transformer2DModelOutput(BaseOutput):
     """
 
     sample: torch.FloatTensor
+
+    # Implementing PatchableValueInterface
+    def patched(self, hook: str, patcher: StepPatcher):
+        return Transformer2DModelOutput(
+            patcher(hook, self.sample)
+        )
 
 
 class Transformer2DModel(StepPatchingMixin, ModelMixin, ConfigMixin):

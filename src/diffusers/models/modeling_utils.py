@@ -18,6 +18,7 @@ import inspect
 import os
 from functools import partial
 from typing import Callable, List, Optional, Tuple, Union
+from typing_extensions import Self
 
 import torch
 from huggingface_hub import hf_hub_download
@@ -40,7 +41,6 @@ from ..utils import (
     logging,
 )
 from ..controllers import StepPatcher
-
 
 logger = logging.get_logger(__name__)
 
@@ -856,11 +856,47 @@ def _get_model_file(
             )
 
 
-# Design credit: @HimariO
-# Lovely piece of work.
+# TODO: Review
+# I'm using this as an interface in a way that I probably shouldn't be? This probably isn't pythonic.
+# This basically only exists to enable `isinstance` instead of `hasattr`...
+# And to slightly help with static typechecking, but that seems to be broken all over the project anyway.
+class PatchableValueInterface():
+    """
+    Interface that may be added and overriden in class. Intended for use in Model Output classes.
+    Allows a `StepPatcher` to be applied to an arbitrary class.
+    Implementers should invoke the `patcher` once for each patchable value,
+    amending the hook path appropriately when there may be more than one invocation.
+    """
+    # TODO: Rename to something less generic?
+    def patched(self, hook: str, patcher: StepPatcher) -> Self:
+        raise NotImplementedError("Implementers of this interface must override this method.")
+
+
+PatchableValue = Union[Union[Tensor, PatchableValueInterface], Tuple[Union[Tensor, PatchableValueInterface]]]
+
+
+def patch_module_output(output: PatchableValue, hook: str, patcher: StepPatcher):
+    """
+    Applies a `StepPatcher` to a patchable value, using the specified hook.
+    """
+    if isinstance(output, Tensor):
+        return patcher(hook, output)
+    
+    if isinstance(output, PatchableValueInterface):
+        return output.patched(hook, patcher)
+    
+    if isinstance(output, tuple):
+        return tuple(patch_module_output(o, f"{hook}[{i}]", patcher) for i, o in enumerate(output))
+    
+    raise TypeError(f"Module output type '{type(output)}' cannot be patched.")
+
+
+
 class StepPatchingMixin():
     """
     A `nn.Module` hook that calls into a `StepPatcher` after the forward pass.
+    The forward pass must return a value consistent with `PatchableValue`.
+    That means a `Tensor`, a class implementing `PatchableValueInterface`, or a tuple thereof.
     """
 
     def _set_step_patcher(self, name: str, patcher: StepPatcher):
@@ -872,27 +908,36 @@ class StepPatchingMixin():
         self._step_patcher = None
 
     @staticmethod
-    def set_step_patcher_deep(name: str, module: torch.nn.Module, patcher: StepPatcher):        
+    def set_step_patcher_recursive(name: str, module: torch.nn.Module, patcher: StepPatcher):
+        """
+        Stashes the provided `StepPatcher` in `module` and all patchable children recursively.
+        This is responsible for setting up the hook paths.
+        `unset_step_patcher_recursive` should be called when this is no longer needed.
+        """
         if isinstance(module, StepPatchingMixin):
             module._set_step_patcher(name, patcher)
         
         for child_name, child in module.named_children():
-            StepPatchingMixin.set_step_patcher_deep(f"{name}.{child_name}", child, patcher)
+            StepPatchingMixin.set_step_patcher_recursive(f"{name}.{child_name}", child, patcher)
 
     @staticmethod
-    def unset_step_patcher_deep(module: torch.nn.Module):
+    def unset_step_patcher_recursive(module: torch.nn.Module):
+        """
+        Unstashes the `StepPatcher` stored in `module` and all children recursively.
+        """
         if isinstance(module, StepPatchingMixin):
             module._unset_step_patcher()
         
         for child in module.children():
-            StepPatchingMixin.unset_step_patcher_deep(child)
+            StepPatchingMixin.unset_step_patcher_recursive(child)
 
+    # This overrides the builtin __call__ of the module to call the appropriate patcher hook after the module has run.
     def __call__(self, *args, **kwargs):
-        s = super()
-        if not isinstance(s, torch.nn.Module): return
-        state = s.__call__(*args, **kwargs)
-        if not hasattr(self, "_step_patcher"): return state
-        if not hasattr(self, "_module_name"): return state
-        if not isinstance(self._module_name, str): return state
-        if not isinstance(self._step_patcher, StepPatcher): return state
-        return self._step_patcher(self._module_name, state)
+        assert isinstance(self, torch.nn.Module), f"Expected 'self' to be an 'nn.Module', but was '{type(self)}'."
+        # TODO: Is there a good way to fix the static typechecking on __call__?
+        output: PatchableValue = super().__call__(*args, **kwargs)
+        if not hasattr(self, "_step_patcher"): return output
+        if not hasattr(self, "_module_name"): return output
+        if not isinstance(self._module_name, str): return output
+        if not isinstance(self._step_patcher, StepPatcher): return output
+        return patch_module_output(output, self._module_name, self._step_patcher)

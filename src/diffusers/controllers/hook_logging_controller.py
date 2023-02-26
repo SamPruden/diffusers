@@ -8,5 +8,10 @@ class HookLoggingStepPatcher(ValueStepPatcher):
         return None
 
 class HookLoggingController(Controller[TControllerParams]):
+    """
+    Simply prints every hook called.
+    Useful during development/debugging.
+    """
+    
     def __call__(self, *args: TControllerParams.args, **kwargs: TControllerParams.kwargs):
-        return HookLoggingStepPatcher(self)
+        return HookLoggingStepPatcher()
