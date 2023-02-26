@@ -172,3 +172,7 @@ tags
 
 # ruff
 .ruff_cache
+
+# Google drive
+.tmp.drivedownload
+.tmp.driveupload
